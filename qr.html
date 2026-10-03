@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bee Hive QR Poster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+</head>
+<body>
+<main class="wrap poster">
+  <header class="crest">
+    <p class="eyebrow" id="lodgeName">Bee Hive Lodge No. 66</p>
+    <h1>Sign in for today's meeting</h1>
+  </header>
+  <p style="margin:0">Point your phone's camera at the code and tap the link.</p>
+  <div class="qr" id="qr"></div>
+  <p class="url" id="url"></p>
+  <p class="no-print"><button type="button" onclick="window.print()">Print this poster</button></p>
+</main>
+<script>
+  const cfg = window.BEEHIVE;
+  document.getElementById("lodgeName").textContent = cfg.lodgeName;
+  const link = new URL("./", location.href).href;
+  const qr = qrcode(0, "M");
+  qr.addData(link);
+  qr.make();
+  document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
+  document.getElementById("url").textContent = link;
+</script>
+</body>
+</html>

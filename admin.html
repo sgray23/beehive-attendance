@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Bee Hive Attendance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+<main class="wrap wide">
+  <header class="crest">
+    <p class="eyebrow" id="lodgeName">Bee Hive Lodge No. 66</p>
+    <h1>Attendance Records</h1>
+  </header>
+
+  <!-- Signed out -->
+  <form class="card" id="login" hidden>
+    <p style="margin:0">Secretary and officer access. Enter your email and we'll send you a sign-in link.</p>
+    <label for="email">Email
+      <input id="email" type="email" autocomplete="email" required>
+    </label>
+    <p class="notice" id="loginMsg" role="status" hidden></p>
+    <button type="submit" id="loginBtn">Email me a sign-in link</button>
+  </form>
+
+  <!-- Signed in -->
+  <section class="card" id="records" hidden>
+    <div class="toolbar">
+      <label for="day">Meeting date
+        <input id="day" type="date">
+      </label>
+      <button type="button" id="xlsxDay">Download this day (Excel)</button>
+      <button type="button" class="secondary" id="xlsxAll">Download all records</button>
+    </div>
+    <div class="stats" id="stats"></div>
+    <p class="notice err" id="loadErr" role="alert" hidden></p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>#</th><th>Name</th><th>Lodge</th><th>Title</th><th>Signed in</th><th><span class="sr">Remove</span></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p id="empty" hidden style="margin:0;color:var(--muted)">No one has signed in for this date yet. Share the QR code or the sign-in link and entries will appear here.</p>
+    <div class="toolbar">
+      <a class="button secondary" href="qr.html" target="_blank" rel="noopener">Open the QR code poster</a>
+      <button type="button" class="secondary" id="logout">Sign out</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(async function () {
+  const cfg = window.BEEHIVE;
+  const $ = (id) => document.getElementById(id);
+  const sb = supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+  $("lodgeName").textContent = cfg.lodgeName;
+
+  const todayISO = () => new Intl.DateTimeFormat("en-CA", { timeZone: cfg.timeZone }).format(new Date());
+  const timeOf = (ts) => new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: cfg.timeZone });
+  const longDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+
+  let current = [];
+  let pendingRemove = null;
+
+  // ---- Sign in ----
+  $("login").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("loginMsg");
+    $("loginBtn").disabled = true;
+    const { error } = await sb.auth.signInWithOtp({
+      email: $("email").value.trim(),
+      options: { emailRedirectTo: location.href.split("#")[0], shouldCreateUser: true }
+    });
+    $("loginBtn").disabled = false;
+    msg.hidden = false;
+    msg.className = "notice " + (error ? "err" : "ok");
+    msg.textContent = error
+      ? "Couldn't send the link: " + error.message
+      : "Check your email for the sign-in link, then open it on this device.";
+  });
+
+  $("logout").addEventListener("click", async () => { await sb.auth.signOut(); render(null); });
+
+  sb.auth.onAuthStateChange((_evt, session) => render(session));
+  const { data } = await sb.auth.getSession();
+  render(data.session);
+
+  function render(session) {
+    $("login").hidden = !!session;
+    $("records").hidden = !session;
+    if (session) {
+      if (!$("day").value) $("day").value = todayISO();
+      load();
+    }
+  }
+
+  // ---- Records ----
+  $("day").addEventListener("change", load);
+
+  async function load() {
+    const day = $("day").value;
+    $("loadErr").hidden = true;
+    const { data, error } = await sb.from("attendance")
+      .select("id, meeting_date, signed_in_at, name, lodge, title")
+      .eq("meeting_date", day)
+      .order("signed_in_at", { ascending: true });
+    if (error) return showLoadError(error);
+    current = data;
+    draw();
+  }
+
+  function showLoadError(error) {
+    $("loadErr").hidden = false;
+    $("loadErr").textContent = "Couldn't load attendance: " + error.message;
+  }
+
+  function draw() {
+    const tbody = $("rows");
+    tbody.replaceChildren();
+    current.forEach((r, i) => {
+      const tr = document.createElement("tr");
+      const cells = [String(i + 1), r.name, r.lodge, r.title || "", timeOf(r.signed_in_at)];
+      cells.forEach((text, c) => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        if (c === 0 || c === 4) td.className = "num";
+        tr.appendChild(td);
+      });
+      const td = document.createElement("td");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "secondary remove";
+      btn.textContent = pendingRemove === r.id ? "Confirm remove" : "Remove";
+      btn.addEventListener("click", () => removeRow(r.id));
+      td.appendChild(btn);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    });
+    $("empty").hidden = current.length > 0;
+    const own = current.filter((r) => r.lodge.toLowerCase() === cfg.lodgeName.toLowerCase()).length;
+    $("stats").innerHTML = "";
+    [["Signed in", current.length], ["Members of " + cfg.lodgeName, own], ["Visitors", current.length - own]]
+      .forEach(([label, n]) => {
+        const s = document.createElement("span");
+        s.append(label + ": ");
+        const b = document.createElement("strong");
+        b.textContent = n;
+        s.appendChild(b);
+        $("stats").appendChild(s);
+      });
+  }
+
+  async function removeRow(id) {
+    if (pendingRemove !== id) { pendingRemove = id; return draw(); }
+    pendingRemove = null;
+    const { error } = await sb.from("attendance").delete().eq("id", id);
+    if (error) return showLoadError(error);
+    load();
+  }
+
+  // ---- Excel ----
+  function toSheet(rows, withDate) {
+    const header = withDate
+      ? ["Date", "#", "Name", "Lodge", "Title", "Signed in"]
+      : ["#", "Name", "Lodge", "Title", "Signed in"];
+    const body = rows.map((r, i) => {
+      const line = [i + 1, r.name, r.lodge, r.title || "", timeOf(r.signed_in_at)];
+      return withDate ? [r.meeting_date, ...line] : line;
+    });
+    const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+    ws["!cols"] = header.map((h) => ({ wch: h === "Name" || h === "Lodge" ? 30 : h === "Title" ? 24 : 12 }));
+    return ws;
+  }
+
+  $("xlsxDay").addEventListener("click", () => {
+    const day = $("day").value;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, toSheet(current, false), day);
+    wb.Props = { Title: cfg.lodgeName + " attendance, " + longDate(day) };
+    XLSX.writeFile(wb, "BeeHive-Attendance-" + day + ".xlsx");
+  });
+
+  $("xlsxAll").addEventListener("click", async () => {
+    const { data, error } = await sb.from("attendance")
+      .select("meeting_date, signed_in_at, name, lodge, title")
+      .order("meeting_date", { ascending: true })
+      .order("signed_in_at", { ascending: true })
+      .limit(10000);
+    if (error) return showLoadError(error);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, toSheet(data, true), "All meetings");
+    XLSX.writeFile(wb, "BeeHive-Attendance-All.xlsx");
+  });
+})();
+</script>
+<style>.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}</style>
+</body>
+</html>

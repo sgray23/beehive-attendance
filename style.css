@@ -1,0 +1,108 @@
+/* Layout: one narrow column, built for a phone held at the lodge door. */
+:root {
+  --bg: #f5f3ee;
+  --surface: #ffffff;
+  --ink: #1d2233;
+  --muted: #5d6275;
+  --line: #d9d6cc;
+  --indigo: #23306b;
+  --honey: #b8780f;
+  --honey-soft: #f6e7c8;
+  --ok: #1f6b3a;
+  --err: #a12a24;
+  --display: "Cinzel", "Times New Roman", serif;
+  --body: "Source Sans 3", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12141d;
+    --surface: #1b1e2a;
+    --ink: #eceae4;
+    --muted: #a3a6b4;
+    --line: #2f3344;
+    --indigo: #9fb0ff;
+    --honey: #e6a83a;
+    --honey-soft: #3a2f17;
+    --ok: #6fcf8f;
+    --err: #ff8a80;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 17px/1.5 var(--body);
+  padding: 0 16px;
+  padding-block: max(24px, env(safe-area-inset-top)) max(32px, env(safe-area-inset-bottom));
+}
+.wrap { max-width: 440px; margin: 0 auto; display: grid; gap: 24px; }
+.wrap.wide { max-width: 960px; }
+
+header.crest { display: grid; justify-items: center; gap: 8px; text-align: center; }
+header.crest svg { width: 56px; height: 56px; }
+.eyebrow {
+  font-size: 13px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--honey); font-weight: 600; margin: 0;
+}
+h1 {
+  font-family: var(--display); font-weight: 600; font-size: 28px; line-height: 1.2;
+  margin: 0; color: var(--indigo); text-wrap: balance;
+}
+.date { color: var(--muted); margin: 0; font-variant-numeric: tabular-nums; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 20px; display: grid; gap: 16px;
+}
+label { display: grid; gap: 6px; font-weight: 600; font-size: 15px; }
+label .hint { font-weight: 400; color: var(--muted); }
+input, select {
+  font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; width: 100%;
+}
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 3px solid var(--honey); outline-offset: 2px;
+}
+button, .button {
+  font: inherit; font-weight: 700; border: 0; border-radius: 10px; cursor: pointer;
+  padding: 14px 18px; background: var(--indigo); color: var(--surface);
+  text-decoration: none; text-align: center; display: inline-block;
+}
+button.secondary, .button.secondary {
+  background: transparent; color: var(--indigo); border: 1px solid var(--line);
+}
+button:disabled { opacity: .6; cursor: progress; }
+
+.notice { border-radius: 10px; padding: 14px 16px; margin: 0; }
+.notice.ok  { background: var(--honey-soft); color: var(--ink); }
+.notice.err { border: 1px solid var(--err); color: var(--err); }
+
+.done { text-align: center; display: grid; gap: 12px; justify-items: center; }
+.done h2 { font-family: var(--display); color: var(--indigo); margin: 0; font-size: 24px; }
+
+footer { text-align: center; color: var(--muted); font-size: 14px; }
+
+/* Admin */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.toolbar label { flex: 1 1 180px; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 24px; color: var(--muted); }
+.stats strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+td .remove { padding: 4px 10px; font-size: 14px; font-weight: 600; }
+
+/* QR poster */
+.poster { text-align: center; }
+.poster .qr svg { width: min(80vw, 360px); height: auto; background: #fff; padding: 12px; border-radius: 12px; }
+.poster .url { word-break: break-all; color: var(--muted); }
+@media print {
+  body { background: #fff; color: #000; }
+  .no-print { display: none; }
+}

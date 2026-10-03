@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bee Hive Sign-In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="config.js"></script>
+</head>
+<body>
+<main class="wrap">
+  <header class="crest">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <g fill="none" stroke="var(--honey)" stroke-width="3" stroke-linecap="round">
+        <path d="M24 14h16"/>
+        <path d="M18 22h28"/>
+        <path d="M14 30h36"/>
+        <path d="M12 38h40"/>
+        <path d="M12 46h40"/>
+        <path d="M10 54h44"/>
+      </g>
+      <path d="M27 54v-6a5 5 0 0 1 10 0v6z" fill="var(--indigo)"/>
+    </svg>
+    <p class="eyebrow" id="lodgeName">Bee Hive Lodge No. 66</p>
+    <h1>Meeting Sign-In</h1>
+    <p class="date" id="today"></p>
+  </header>
+
+  <form class="card" id="form" novalidate>
+    <label for="name">Full name
+      <input id="name" name="name" autocomplete="name" required minlength="2" maxlength="80" placeholder="e.g. John A. Smith">
+    </label>
+    <label for="lodge">Lodge
+      <input id="lodge" name="lodge" required minlength="2" maxlength="80" autocomplete="organization">
+    </label>
+    <label for="title">Title <span class="hint">(optional)</span>
+      <input id="title" name="title" list="titles" maxlength="60" placeholder="Choose or type your title">
+      <datalist id="titles"></datalist>
+    </label>
+    <p class="notice err" id="error" role="alert" hidden></p>
+    <button type="submit" id="submit">Sign in</button>
+  </form>
+
+  <section class="card done" id="done" hidden aria-live="polite">
+    <h2>You're signed in</h2>
+    <p id="doneText"></p>
+    <button type="button" class="secondary" id="another">Sign in someone else</button>
+  </section>
+
+  <footer>Your name, lodge and title are kept in the lodge's attendance record.</footer>
+</main>
+
+<script>
+(function () {
+  const cfg = window.BEEHIVE;
+  const $ = (id) => document.getElementById(id);
+  const form = $("form"), error = $("error"), submit = $("submit");
+
+  $("lodgeName").textContent = cfg.lodgeName;
+  $("today").textContent = new Date().toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: cfg.timeZone
+  });
+  for (const t of cfg.titles) {
+    const o = document.createElement("option");
+    o.value = t;
+    $("titles").appendChild(o);
+  }
+
+  // Remember this phone's last entry so returning members sign in with one tap.
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("beehive-last") || "{}"); } catch (e) {}
+  $("name").value = saved.name || "";
+  $("lodge").value = saved.lodge || cfg.lodgeName;
+  $("title").value = saved.title || "";
+
+  function showError(msg) { error.textContent = msg; error.hidden = !msg; }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const entry = {
+      name: $("name").value.trim().replace(/\s+/g, " "),
+      lodge: $("lodge").value.trim().replace(/\s+/g, " "),
+      title: $("title").value.trim() || null
+    };
+    if (entry.name.length < 2) return showError("Please enter your full name.");
+    if (entry.lodge.length < 2) return showError("Please enter your lodge.");
+    showError("");
+    submit.disabled = true;
+    submit.textContent = "Signing in…";
+    try {
+      const res = await fetch(cfg.supabaseUrl + "/rest/v1/attendance", {
+        method: "POST",
+        headers: {
+          "apikey": cfg.supabaseKey,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify(entry)
+      });
+      if (res.status === 409) {
+        finish(entry, entry.name + " is already on today's attendance. No need to sign in again.");
+      } else if (!res.ok) {
+        throw new Error("status " + res.status);
+      } else {
+        finish(entry, "Welcome, " + entry.name + ". Your attendance for today is recorded.");
+      }
+    } catch (err) {
+      showError("Sign-in didn't go through. Check your signal and tap Sign in again.");
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "Sign in";
+    }
+  });
+
+  function finish(entry, message) {
+    try { localStorage.setItem("beehive-last", JSON.stringify(entry)); } catch (e) {}
+    $("doneText").textContent = message;
+    form.hidden = true;
+    $("done").hidden = false;
+  }
+
+  $("another").addEventListener("click", () => {
+    $("name").value = "";
+    $("title").value = "";
+    $("lodge").value = cfg.lodgeName;
+    $("done").hidden = true;
+    form.hidden = false;
+    $("name").focus();
+  });
+})();
+</script>
+</body>
+</html>
